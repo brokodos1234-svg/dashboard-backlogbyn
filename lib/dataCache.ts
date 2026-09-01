@@ -18,11 +18,11 @@ interface FullData {
   master: MasterRow[];
 }
 
-let cache: { data: FullData | null; fetchedAt: number; refreshing: boolean } = {
+let cache: { data: FullData | null; fetchedAt: number } = {
   data: null,
   fetchedAt: 0,
-  refreshing: false,
 };
+let inflight: Promise<FullData> | null = null;
 
 async function loadFullData(): Promise<FullData> {
   const workbookBuf = await fetchWorkbookArrayBuffer();
@@ -54,16 +54,23 @@ async function loadFullData(): Promise<FullData> {
   return { bundle, master };
 }
 
-async function refresh(): Promise<FullData> {
-  cache.refreshing = true;
-  try {
-    const data = await loadFullData();
-    cache = { data, fetchedAt: Date.now(), refreshing: false };
-    return data;
-  } catch (err) {
-    cache.refreshing = false;
-    throw err;
+function refresh(): Promise<FullData> {
+  // De-duplicate concurrent callers (e.g. several visitors hitting a cold
+  // cache at once) onto a single in-flight parse instead of each kicking
+  // off their own ~20s workbook parse.
+  if (!inflight) {
+    inflight = loadFullData()
+      .then((data) => {
+        cache = { data, fetchedAt: Date.now() };
+        inflight = null;
+        return data;
+      })
+      .catch((err) => {
+        inflight = null;
+        throw err;
+      });
   }
+  return inflight;
 }
 
 export async function getFullData(): Promise<FullData> {
@@ -73,7 +80,7 @@ export async function getFullData(): Promise<FullData> {
     return refresh();
   }
 
-  if (isStale && !cache.refreshing) {
+  if (isStale) {
     // Stale-while-revalidate: serve what we have, refresh in the background.
     refresh().catch((err) => {
       console.error("[dataCache] background refresh failed:", err);
