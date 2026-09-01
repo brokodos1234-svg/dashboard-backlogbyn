@@ -257,24 +257,37 @@ const MASTER_FIELD_ORDER: (keyof MasterRow)[] = [
   "statusItem",
 ];
 
+function cellText(ws: XLSX.WorkSheet, r: number, c: number): string {
+  // readWorkbook() parses with `dense: true`, which stores each row as
+  // ws[rowIndex] (an array of cells) instead of the usual ws["A1"]-keyed
+  // object — a plain ws[encode_cell(...)] lookup silently returns undefined
+  // here.
+  const row = (ws as unknown as Record<number, XLSX.CellObject[]>)[r];
+  const obj = row?.[c];
+  if (!obj) return "";
+  // .w is SheetJS's already-computed formatted text (what raw:false would
+  // give); falling back to .v avoids re-deriving it from scratch.
+  return toStr(obj.w !== undefined ? obj.w : obj.v);
+}
+
 export function parseMasterSheet(wb: XLSX.WorkBook): MasterRow[] {
   const ws = wb.Sheets["MASTER"];
   if (!ws) throw new Error('Sheet "MASTER" tidak ditemukan pada workbook.');
+  const ref = ws["!ref"];
+  if (!ref) return [];
+  const range = XLSX.utils.decode_range(ref);
 
-  const raw = XLSX.utils.sheet_to_json<string[]>(ws, {
-    header: 1,
-    defval: "",
-    raw: false,
-    blankrows: false,
-  });
-
+  // Read cells straight off the parsed sheet into the final MasterRow shape
+  // instead of first materializing a full string[][] via sheet_to_json and
+  // then mapping that into objects — on a ~37k-row sheet that intermediate
+  // copy was enough to push memory-constrained hosts (e.g. Railway's trial
+  // tier) into an OOM crash.
   const out: MasterRow[] = [];
-  for (let i = 1; i < raw.length; i++) {
-    const r = raw[i];
-    if (!r || !toStr(r[0])) continue;
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
+    if (!cellText(ws, r, 0)) continue;
     const rowObj: Partial<MasterRow> = { idx: out.length };
     MASTER_FIELD_ORDER.forEach((field, colIdx) => {
-      (rowObj as Record<string, string | number>)[field] = toStr(r[colIdx]);
+      (rowObj as Record<string, string | number>)[field] = cellText(ws, r, colIdx);
     });
     out.push(rowObj as MasterRow);
   }
