@@ -1,22 +1,29 @@
 import type { MasterFacets, MasterRow } from "./types";
 
+export function parseListParam(value: string | null): string[] | undefined {
+  if (!value) return undefined;
+  const list = value.split(",").filter(Boolean);
+  return list.length > 0 ? list : undefined;
+}
+
 export interface MasterFilterParams {
   q?: string;
   cn?: string;
-  moType?: string;
-  statusEksekusi?: string;
-  statusItem?: string;
-  moOpenClose?: string;
+  moType?: string[];
+  statusEksekusi?: string[];
+  statusItem?: string[];
+  moOpenClose?: string[];
 }
 
 export function filterMasterRows(rows: MasterRow[], f: MasterFilterParams): MasterRow[] {
   const q = f.q?.trim().toLowerCase();
   return rows.filter((r) => {
     if (f.cn && r.cn !== f.cn) return false;
-    if (f.moType && r.moType !== f.moType) return false;
-    if (f.statusEksekusi && r.statusEksekusi !== f.statusEksekusi) return false;
-    if (f.statusItem && r.statusItem !== f.statusItem) return false;
-    if (f.moOpenClose && r.moOpenClose !== f.moOpenClose) return false;
+    if (f.moType && f.moType.length > 0 && !f.moType.includes(r.moType)) return false;
+    if (f.statusEksekusi && f.statusEksekusi.length > 0 && !f.statusEksekusi.includes(r.statusEksekusi))
+      return false;
+    if (f.statusItem && f.statusItem.length > 0 && !f.statusItem.includes(r.statusItem)) return false;
+    if (f.moOpenClose && f.moOpenClose.length > 0 && !f.moOpenClose.includes(r.moOpenClose)) return false;
     if (q) {
       const hay = `${r.reservation} ${r.mtcOrder} ${r.pr} ${r.po} ${r.cn} ${r.material} ${r.description} ${r.equipment}`.toLowerCase();
       if (!hay.includes(q)) return false;

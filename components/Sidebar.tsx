@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/", label: "Overview", icon: HomeIcon },
   { href: "/dashboard", label: "Detail Data (Master)", icon: TableIcon },
   { href: "/dashboard/unit", label: "Breakdown Unit (C/N)", icon: UnitIcon },
+  { href: "/dashboard/mo-open", label: "MO Open", icon: MoOpenIcon },
 ];
 
 export default function Sidebar() {
@@ -27,7 +28,7 @@ export default function Sidebar() {
 
       <nav className="mt-8 flex flex-1 flex-col gap-1">
         {ITEMS.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = pathname === item.href;
           const Icon = item.icon;
           return (
             <Link
@@ -80,6 +81,16 @@ function UnitIcon() {
       <rect x="12.5" y="3.5" width="8" height="8" rx="1.5" />
       <rect x="3.5" y="12.5" width="8" height="8" rx="1.5" />
       <rect x="12.5" y="12.5" width="8" height="8" rx="1.5" />
+    </svg>
+  );
+}
+
+function MoOpenIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z" strokeLinejoin="round" />
+      <path d="M4 7.5V16l8 4.5 8-4.5V7.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 12v8.5" strokeLinecap="round" />
     </svg>
   );
 }

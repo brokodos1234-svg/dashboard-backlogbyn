@@ -6,14 +6,15 @@ import type { MasterFacets, MasterRow } from "@/lib/types";
 import { MASTER_COLUMNS } from "@/lib/masterColumns";
 import { exportToExcel, exportToPdf } from "@/lib/exportClient";
 import StatusPill from "./StatusPill";
+import MultiSelectFilter from "./MultiSelectFilter";
 
 interface Filters {
   q: string;
   cn: string;
-  moType: string;
-  statusEksekusi: string;
-  statusItem: string;
-  moOpenClose: string;
+  moType: string[];
+  statusEksekusi: string[];
+  statusItem: string[];
+  moOpenClose: string[];
 }
 
 const EMPTY_FACETS: MasterFacets = {
@@ -26,6 +27,10 @@ const EMPTY_FACETS: MasterFacets = {
 
 const PILL_KEYS = new Set(["statusEksekusi", "statusItem", "statusRunning", "moOpenClose"]);
 
+function parseParam(v: string | null): string[] {
+  return v ? v.split(",").filter(Boolean) : [];
+}
+
 export default function MasterExplorer() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,10 +38,10 @@ export default function MasterExplorer() {
   const [filters, setFilters] = useState<Filters>({
     q: searchParams.get("q") || "",
     cn: searchParams.get("cn") || "",
-    moType: searchParams.get("moType") || "",
-    statusEksekusi: searchParams.get("statusEksekusi") || "",
-    statusItem: searchParams.get("statusItem") || "",
-    moOpenClose: searchParams.get("moOpenClose") || "",
+    moType: parseParam(searchParams.get("moType")),
+    statusEksekusi: parseParam(searchParams.get("statusEksekusi")),
+    statusItem: parseParam(searchParams.get("statusItem")),
+    moOpenClose: parseParam(searchParams.get("moOpenClose")),
   });
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
@@ -51,10 +56,10 @@ export default function MasterExplorer() {
     const sp = new URLSearchParams();
     if (filters.q) sp.set("q", filters.q);
     if (filters.cn) sp.set("cn", filters.cn);
-    if (filters.moType) sp.set("moType", filters.moType);
-    if (filters.statusEksekusi) sp.set("statusEksekusi", filters.statusEksekusi);
-    if (filters.statusItem) sp.set("statusItem", filters.statusItem);
-    if (filters.moOpenClose) sp.set("moOpenClose", filters.moOpenClose);
+    if (filters.moType.length) sp.set("moType", filters.moType.join(","));
+    if (filters.statusEksekusi.length) sp.set("statusEksekusi", filters.statusEksekusi.join(","));
+    if (filters.statusItem.length) sp.set("statusItem", filters.statusItem.join(","));
+    if (filters.moOpenClose.length) sp.set("moOpenClose", filters.moOpenClose.join(","));
     return sp;
   }, [filters]);
 
@@ -97,12 +102,19 @@ export default function MasterExplorer() {
     };
   }, [queryString, page, pageSize]);
 
-  const updateFilter = useCallback((key: keyof Filters, value: string) => {
+  const updateText = useCallback((key: "q" | "cn", value: string) => {
     setFilters((f) => ({ ...f, [key]: value }));
   }, []);
 
+  const updateMulti = useCallback(
+    (key: "moType" | "statusEksekusi" | "statusItem" | "moOpenClose", values: string[]) => {
+      setFilters((f) => ({ ...f, [key]: values }));
+    },
+    []
+  );
+
   const resetFilters = useCallback(() => {
-    setFilters({ q: "", cn: "", moType: "", statusEksekusi: "", statusItem: "", moOpenClose: "" });
+    setFilters({ q: "", cn: "", moType: [], statusEksekusi: [], statusItem: [], moOpenClose: [] });
   }, []);
 
   const runExport = useCallback(
@@ -132,42 +144,40 @@ export default function MasterExplorer() {
             type="text"
             placeholder="Cari MO / PR / PO / material..."
             value={filters.q}
-            onChange={(e) => updateFilter("q", e.target.value)}
+            onChange={(e) => updateText("q", e.target.value)}
             className="rounded-lg border border-black/10 px-3 py-2 text-sm outline-none focus:border-ink lg:col-span-2"
           />
-          <FacetSelect
-            label="C/N"
+          <CnSearchInput
             value={filters.cn}
             options={facets.cnOptions}
-            onChange={(v) => updateFilter("cn", v)}
-            searchable
+            onChange={(v) => updateText("cn", v)}
           />
-          <FacetSelect
+          <MultiSelectFilter
             label="MO Type"
-            value={filters.moType}
             options={facets.moTypeOptions}
-            onChange={(v) => updateFilter("moType", v)}
+            selected={filters.moType}
+            onChange={(v) => updateMulti("moType", v)}
           />
-          <FacetSelect
+          <MultiSelectFilter
             label="Status Eksekusi"
-            value={filters.statusEksekusi}
             options={facets.statusEksekusiOptions}
-            onChange={(v) => updateFilter("statusEksekusi", v)}
+            selected={filters.statusEksekusi}
+            onChange={(v) => updateMulti("statusEksekusi", v)}
           />
-          <FacetSelect
+          <MultiSelectFilter
             label="Status Item"
-            value={filters.statusItem}
             options={facets.statusItemOptions}
-            onChange={(v) => updateFilter("statusItem", v)}
+            selected={filters.statusItem}
+            onChange={(v) => updateMulti("statusItem", v)}
           />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <FacetSelect
+            <MultiSelectFilter
               label="MO Open/Close"
-              value={filters.moOpenClose}
               options={facets.moOpenCloseOptions}
-              onChange={(v) => updateFilter("moOpenClose", v)}
+              selected={filters.moOpenClose}
+              onChange={(v) => updateMulti("moOpenClose", v)}
             />
             <button
               onClick={resetFilters}
@@ -263,52 +273,29 @@ export default function MasterExplorer() {
   );
 }
 
-function FacetSelect({
-  label,
+function CnSearchInput({
   value,
   options,
   onChange,
-  searchable,
 }: {
-  label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
-  searchable?: boolean;
 }) {
-  const listId = searchable ? `list-${label.replace(/\s+/g, "-")}` : undefined;
-
-  if (searchable) {
-    return (
-      <div>
-        <input
-          list={listId}
-          placeholder={label}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm outline-none focus:border-ink"
-        />
-        <datalist id={listId}>
-          {options.map((o) => (
-            <option key={o} value={o} />
-          ))}
-        </datalist>
-      </div>
-    );
-  }
-
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-ink"
-    >
-      <option value="">{label}: Semua</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
+    <div>
+      <input
+        list="list-cn"
+        placeholder="C/N"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm outline-none focus:border-ink"
+      />
+      <datalist id="list-cn">
+        {options.map((o) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
+    </div>
   );
 }

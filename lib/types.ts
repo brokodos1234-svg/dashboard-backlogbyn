@@ -82,9 +82,15 @@ export interface PriorityUnit {
   moOpen: number;
   achMoAvg: number;
   itemOutstanding: number;
+  ready: number;
   shortage: number;
   achItemPct: number;
+  siapEksekusi: number;
+  opsionalEksekusi: number;
   belumSiapEksekusi: number;
+  backlogMo: number;
+  schedulePcrMo: number;
+  capitalizeMo: number;
   valueOutstandingMn: number;
   rank: number;
 }
@@ -201,6 +207,7 @@ export interface DashboardBundle {
   penyerapan: PenyerapanSummary;
   readiness: ReadinessSummary;
   priorityUnits: PriorityUnit[];
+  moOpenList: PriorityUnit[];
   unitBreakdown: UnitBreakdownRow[];
   alerts: AlertItem[];
   previewRows: MasterRow[];

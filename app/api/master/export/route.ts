@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMasterRows } from "@/lib/dataCache";
-import { filterMasterRows } from "@/lib/masterQuery";
+import { filterMasterRows, parseListParam } from "@/lib/masterQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
     const filtered = filterMasterRows(all, {
       q: sp.get("q") || undefined,
       cn: sp.get("cn") || undefined,
-      moType: sp.get("moType") || undefined,
-      statusEksekusi: sp.get("statusEksekusi") || undefined,
-      statusItem: sp.get("statusItem") || undefined,
-      moOpenClose: sp.get("moOpenClose") || undefined,
+      moType: parseListParam(sp.get("moType")),
+      statusEksekusi: parseListParam(sp.get("statusEksekusi")),
+      statusItem: parseListParam(sp.get("statusItem")),
+      moOpenClose: parseListParam(sp.get("moOpenClose")),
     });
 
     return NextResponse.json({

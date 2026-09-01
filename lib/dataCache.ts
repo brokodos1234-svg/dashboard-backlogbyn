@@ -33,7 +33,8 @@ async function loadFullData(): Promise<FullData> {
 
   const penyerapan = buildPenyerapanSummary(penyerapanRows);
   const readiness = buildReadinessSummary(readinessRows);
-  const priorityUnits = buildPriorityUnits(readinessRows);
+  const priorityUnits = buildPriorityUnits(readinessRows, 8);
+  const moOpenList = buildPriorityUnits(readinessRows, Infinity);
   const unitBreakdown = buildUnitBreakdown(readinessRows);
   const master = parseMasterSheet(wb);
   const alerts = buildAlerts(master);
@@ -43,6 +44,7 @@ async function loadFullData(): Promise<FullData> {
     penyerapan,
     readiness,
     priorityUnits,
+    moOpenList,
     unitBreakdown,
     alerts,
     previewRows: master.slice(0, 8),
