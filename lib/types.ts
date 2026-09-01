@@ -112,6 +112,12 @@ export interface UnitBreakdownRow {
   totalValues: number;
 }
 
+/**
+ * Only the ~23 of MASTER's 71 columns that the app actually displays,
+ * filters, searches, or sorts by. Storing all 71 columns for ~37k rows was
+ * a major contributor to OOM crashes on memory-constrained hosts (see
+ * parseMasterSheet in aggregate.ts) for data nothing ever read.
+ */
 export interface MasterRow {
   idx: number;
   statusEksekusi: string;
@@ -119,70 +125,22 @@ export interface MasterRow {
   achItem: string;
   soh: string;
   moType: string;
-  statDesc: string;
   reservation: string;
   itemRes: string;
-  creationResDate: string;
   reqDate: string;
-  plant: string;
-  plantName: string;
   material: string;
   partNumber: string;
   description: string;
-  brand: string;
-  unitModel: string;
-  matType: string;
-  qtyRes: string;
-  uomRes: string;
   equipment: string;
-  equipmentDesc: string;
   mtcOrder: string;
-  createdBy: string;
-  priority: string;
   pr: string;
-  prItem: string;
-  prQuantity: string;
-  prUom: string;
-  releaseStrategy: string;
-  releaseState: string;
-  releaseDate: string;
-  deliveryDatePr: string;
-  createDatePr: string;
-  agingResToPr: string;
   po: string;
-  poItem: string;
-  requestor: string;
-  poQuantity: string;
-  poUom: string;
-  deliveryDatePo: string;
-  createDatePo: string;
-  agingResToPo: string;
-  amountPrice: string;
-  vendor: string;
   gr: string;
-  grQuantity: string;
-  grUom: string;
-  grPostingDate: string;
-  grCreatedDate: string;
-  slocGr: string;
-  diterimaGr: string;
-  diserahkanGr: string;
-  agingResToGr: string;
   gi: string;
-  giQuantity: string;
-  giUom: string;
-  giPostingDate: string;
-  giCreateDate: string;
-  diterimaGi: string;
-  diserahkanGi: string;
-  agingResToGi: string;
-  maintOrderDesc: string;
   statusRunning: string;
-  statusEksekusiByPlan: string;
   price: string;
   totalValues: string;
   cn: string;
-  moFlagFirstRow: string;
   moOpenClose: string;
   statusItem: string;
 }

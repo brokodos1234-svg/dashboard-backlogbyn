@@ -19,6 +19,16 @@ export function readWorkbook(buf: ArrayBuffer): XLSX.WorkBook {
     cellDates: false,
     dense: true,
     sheets: ["RESUME PENYERAPAN", "RESUME DASHBOARD", "MASTER"],
+    // MASTER is almost entirely formulas (readiness/aging logic referencing
+    // MB51 etc.) — SheetJS stores that formula text per cell by default even
+    // though we only ever read the computed .w text. Across ~2.6M cells that
+    // was the single biggest driver of the OOM crashes seen on Railway's
+    // 1GB plan; turning it (and the unused style/number-format capture) off
+    // cut peak RSS from ~850MB to ~380MB without changing any value we read.
+    cellFormula: false,
+    cellHTML: false,
+    cellStyles: false,
+    cellNF: false,
   });
 }
 
@@ -183,78 +193,33 @@ export function buildUnitBreakdown(rows: string[][]): UnitBreakdownRow[] {
   return out;
 }
 
-const MASTER_FIELD_ORDER: (keyof MasterRow)[] = [
-  "statusEksekusi",
-  "achMo",
-  "achItem",
-  "soh",
-  "moType",
-  "statDesc",
-  "reservation",
-  "itemRes",
-  "creationResDate",
-  "reqDate",
-  "plant",
-  "plantName",
-  "material",
-  "partNumber",
-  "description",
-  "brand",
-  "unitModel",
-  "matType",
-  "qtyRes",
-  "uomRes",
-  "equipment",
-  "equipmentDesc",
-  "mtcOrder",
-  "createdBy",
-  "priority",
-  "pr",
-  "prItem",
-  "prQuantity",
-  "prUom",
-  "releaseStrategy",
-  "releaseState",
-  "releaseDate",
-  "deliveryDatePr",
-  "createDatePr",
-  "agingResToPr",
-  "po",
-  "poItem",
-  "requestor",
-  "poQuantity",
-  "poUom",
-  "deliveryDatePo",
-  "createDatePo",
-  "agingResToPo",
-  "amountPrice",
-  "vendor",
-  "gr",
-  "grQuantity",
-  "grUom",
-  "grPostingDate",
-  "grCreatedDate",
-  "slocGr",
-  "diterimaGr",
-  "diserahkanGr",
-  "agingResToGr",
-  "gi",
-  "giQuantity",
-  "giUom",
-  "giPostingDate",
-  "giCreateDate",
-  "diterimaGi",
-  "diserahkanGi",
-  "agingResToGi",
-  "maintOrderDesc",
-  "statusRunning",
-  "statusEksekusiByPlan",
-  "price",
-  "totalValues",
-  "cn",
-  "moFlagFirstRow",
-  "moOpenClose",
-  "statusItem",
+// (field, original 0-indexed column position in the 71-column MASTER sheet).
+// Only the columns the app actually reads are extracted — see the comment
+// on MasterRow in types.ts for why.
+const MASTER_FIELD_COLUMNS: [keyof MasterRow, number][] = [
+  ["statusEksekusi", 0],
+  ["achMo", 1],
+  ["achItem", 2],
+  ["soh", 3],
+  ["moType", 4],
+  ["reservation", 6],
+  ["itemRes", 7],
+  ["reqDate", 9],
+  ["material", 12],
+  ["partNumber", 13],
+  ["description", 14],
+  ["equipment", 20],
+  ["mtcOrder", 22],
+  ["pr", 25],
+  ["po", 35],
+  ["gr", 45],
+  ["gi", 54],
+  ["statusRunning", 63],
+  ["price", 65],
+  ["totalValues", 66],
+  ["cn", 67],
+  ["moOpenClose", 69],
+  ["statusItem", 70],
 ];
 
 function cellText(ws: XLSX.WorkSheet, r: number, c: number): string {
@@ -277,6 +242,19 @@ export function parseMasterSheet(wb: XLSX.WorkBook): MasterRow[] {
   if (!ref) return [];
   const range = XLSX.utils.decode_range(ref);
 
+  // Values like "CLOSE", "READY", "1. BACKLOG" repeat across most of the
+  // ~37k rows; SheetJS doesn't dedupe them, so each cell read otherwise
+  // allocates its own copy of an identical string. Interning within this
+  // one parse call lets every repeat share the same string instance.
+  const pool = new Map<string, string>();
+  const intern = (s: string): string => {
+    if (s === "") return s;
+    const existing = pool.get(s);
+    if (existing !== undefined) return existing;
+    pool.set(s, s);
+    return s;
+  };
+
   // Read cells straight off the parsed sheet into the final MasterRow shape
   // instead of first materializing a full string[][] via sheet_to_json and
   // then mapping that into objects — on a ~37k-row sheet that intermediate
@@ -286,8 +264,8 @@ export function parseMasterSheet(wb: XLSX.WorkBook): MasterRow[] {
   for (let r = range.s.r + 1; r <= range.e.r; r++) {
     if (!cellText(ws, r, 0)) continue;
     const rowObj: Partial<MasterRow> = { idx: out.length };
-    MASTER_FIELD_ORDER.forEach((field, colIdx) => {
-      (rowObj as Record<string, string | number>)[field] = cellText(ws, r, colIdx);
+    MASTER_FIELD_COLUMNS.forEach(([field, colIdx]) => {
+      (rowObj as Record<string, string | number>)[field] = intern(cellText(ws, r, colIdx));
     });
     out.push(rowObj as MasterRow);
   }
